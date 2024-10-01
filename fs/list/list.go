@@ -25,6 +25,7 @@ func DirSorted(ctx context.Context, f fs.Fs, includeAll bool, dir string) (entri
 	if err != nil {
 		return nil, err
 	}
+	fs.Infof(f, "Entries from dir %s: %v", dir, entries)
 	// This should happen only if exclude files lives in the
 	// starting directory, otherwise ListDirSorted should not be
 	// called.

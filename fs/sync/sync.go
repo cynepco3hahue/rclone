@@ -949,6 +949,8 @@ func (s *syncCopyMove) run() error {
 		NoCheckDest:            s.noCheckDest,
 		NoUnicodeNormalization: s.noUnicodeNormalization,
 	}
+	fs.Infof(s.fsrc, "Source fsrc")
+	fs.Infof(s.fdst, "Destination fdst")
 	s.processError(m.Run(s.ctx))
 
 	s.stopTrackRenames()
