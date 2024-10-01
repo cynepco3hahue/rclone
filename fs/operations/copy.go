@@ -136,15 +136,19 @@ func (c *copy) serverSideCopy(ctx context.Context) (actionTaken string, newDst f
 	doCopy := c.dstFeatures.Copy
 	serverSideCopyOK := false
 	if doCopy == nil {
+		fs.Infof(c.src, "Running Server-Side copy no doCopy")
 		serverSideCopyOK = false
 	} else if SameConfig(c.src.Fs(), c.f) {
+		fs.Infof(c.src, "Running Server-Side copy no sameConfig")
 		serverSideCopyOK = true
 	} else if SameRemoteType(c.src.Fs(), c.f) {
+		fs.Infof(c.src, "Running Server-Side copy same remote type")
 		serverSideCopyOK = c.dstFeatures.ServerSideAcrossConfigs || c.ci.ServerSideAcrossConfigs
 	}
 	if !serverSideCopyOK {
 		return actionTaken, nil, fs.ErrorCantCopy
 	}
+	fs.Infof(c.src, "Running Server-Side copy")
 	in := c.tr.Account(ctx, nil) // account the transfer
 	in.ServerSideTransferStart()
 	newDst, err = doCopy(ctx, c.src, c.remoteForCopy)
@@ -307,6 +311,7 @@ func (c *copy) copy(ctx context.Context) (newDst fs.Object, err error) {
 
 		// If can't server-side copy, do it manually
 		if errors.Is(err, fs.ErrorCantCopy) {
+			fs.Infof(c.src, "Running manual copy")
 			actionTaken, newDst, err = c.manualCopy(ctx)
 		}
 

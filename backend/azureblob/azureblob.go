@@ -507,6 +507,9 @@ type Fs struct {
 	pacer         *fs.Pacer                    // To pace and retry the API calls
 	uploadToken   *pacer.TokenDispenser        // control concurrency
 	publicAccess  container.PublicAccessType   // Container Public Access Level
+
+	// TODO: add buffered channel
+	entries chan fs.DirEntry // Channel to limit amount of entries
 }
 
 // Object describes an azure object
@@ -720,15 +723,18 @@ func NewFs(ctx context.Context, name, root string, m configmap.Mapper) (fs.Fs, e
 		cache:       bucket.NewCache(),
 		cntSVCcache: make(map[string]*container.Client, 1),
 	}
+	// TODO: add new buffered channel
+	f.entries = make(chan fs.DirEntry, 5000)
 	f.publicAccess = container.PublicAccessType(opt.PublicAccess)
 	f.setRoot(root)
 	f.features = (&fs.Features{
-		ReadMimeType:      true,
-		WriteMimeType:     true,
-		BucketBased:       true,
-		BucketBasedRootOK: true,
-		SetTier:           true,
-		GetTier:           true,
+		ReadMimeType:            true,
+		WriteMimeType:           true,
+		BucketBased:             true,
+		BucketBasedRootOK:       true,
+		SetTier:                 true,
+		GetTier:                 true,
+		ServerSideAcrossConfigs: true,
 	}).Fill(ctx, f)
 	if opt.DirectoryMarkers {
 		f.features.CanHaveEmptyDirectories = true
@@ -1087,6 +1093,8 @@ func (f *Fs) list(ctx context.Context, containerName, directory, prefix string, 
 		delimiter = "/"
 	}
 
+	fs.Logf(f, "Run azureblob list: prefix %s; directory: %s; delimiter: %s", prefix, directory, delimiter)
+
 	pager := f.cntSVC(containerName).NewListBlobsHierarchyPager(delimiter, &container.ListBlobsHierarchyOptions{
 		// Copy, Metadata, Snapshots, UncommittedBlobs, Deleted, Tags, Versions, LegalHold, ImmutabilityPolicy, DeletedWithVersions bool
 		Include: container.ListBlobsInclude{
@@ -1229,6 +1237,8 @@ func (f *Fs) listDir(ctx context.Context, containerName, directory, prefix strin
 			return err
 		}
 		if entry != nil {
+			// TODO: put here to channel
+			// f.entries <- entry
 			entries = append(entries, entry)
 		}
 		return nil

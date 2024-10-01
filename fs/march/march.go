@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"path"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -87,6 +88,7 @@ func (m *March) makeListDir(ctx context.Context, f fs.Fs, includeAll bool) listD
 		!(ci.NoTraverse && fi.HaveFilesFrom()) { // !(--files-from and --no-traverse)
 		return func(dir string) (entries fs.DirEntries, err error) {
 			dirCtx := filter.SetUseFilter(m.Ctx, f.Features().FilterAware && !includeAll) // make filter-aware backends constrain List
+			fs.Infof(f, "Making ListDir %s", dir)
 			return list.DirSorted(dirCtx, f, includeAll, dir)
 		}
 	}
@@ -179,6 +181,7 @@ func (m *March) Run(ctx context.Context) error {
 					if len(jobs) > 0 {
 						traversing.Add(len(jobs))
 						go func() {
+							fs.Infof(m.Fdst, "Number of go routines %d", runtime.NumGoroutine())
 							// Now we have traversed this directory, send these
 							// jobs off for traversal in the background
 							for _, newJob := range jobs {
@@ -199,13 +202,17 @@ func (m *March) Run(ctx context.Context) error {
 
 	// Start the process
 	traversing.Add(1)
-	in <- listDirJob{
+	fs.Infof(m.Fsrc, "March Source fsrc")
+	fs.Infof(m.Fdst, "March Destination fdst")
+	my_job := listDirJob{
 		srcRemote: m.Dir,
 		srcDepth:  srcDepth - 1,
 		dstRemote: m.Dir,
 		dstDepth:  dstDepth - 1,
 		noDst:     m.NoCheckDest,
 	}
+	fs.Infof(m.Fdst, "Insert job %+v", my_job)
+	in <- my_job
 	go func() {
 		// when the context is cancelled discard the remaining jobs
 		<-m.Ctx.Done()
@@ -461,12 +468,14 @@ func (m *March) processJob(job listDirJob) ([]listDirJob, error) {
 		}
 		recurse := m.Callback.SrcOnly(src)
 		if recurse && job.srcDepth > 0 {
-			jobs = append(jobs, listDirJob{
+			my_job := listDirJob{
 				srcRemote: src.Remote(),
 				dstRemote: src.Remote(),
 				srcDepth:  job.srcDepth - 1,
 				noDst:     true,
-			})
+			}
+			fs.Infof(src, "Src only %+v", my_job)
+			jobs = append(jobs, my_job)
 		}
 
 	}
